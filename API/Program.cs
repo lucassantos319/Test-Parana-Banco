@@ -31,12 +31,14 @@ DependencyContainer.RegisterService(builder.Services);
 
 // Registrar handlers após o EventBus
 builder.Services.AddTransient<IEventHandler<CreditProposalResultEvent>, CreditProposalHandler>();
+builder.Services.AddTransient<IEventHandler<CreditCardResultEvent>, CreditCardHandler>();
 
 var app = builder.Build();
 
 // Configurar inscrição de eventos
 var eventBus = app.Services.GetRequiredService<IEventBus>();
 eventBus.Subscribe<CreditProposalResultEvent, CreditProposalHandler>();
+eventBus.Subscribe<CreditCardResultEvent, CreditCardHandler>();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

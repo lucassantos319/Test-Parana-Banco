@@ -1,4 +1,5 @@
 ﻿using API.Services.Interfaces;
+using Microsoft.Extensions.Logging;
 using SharedLib.Domain.DTOs;
 using SharedLib.Domain.Entities;
 using SharedLib.Domain.Enums;
@@ -40,7 +41,6 @@ namespace API.Services
                     return Result<bool>.Failure($"Cliente com email {client.Email} já existe.");
                 }
 
-                // Converter para ClientDto
                 var clientDto = new ClientDto
                 {
                     Name = client.Name,
@@ -52,29 +52,31 @@ namespace API.Services
                     IncomeAmount = client.Balance,
                 };
 
-                // Salvar no repositório
                 var savedClient = await _repository.CreateAsync(clientDto);
-
-                // Enviar eventos baseado no tipo de conta
-                if (client.Type == AccountTypeEnum.Current && client.Balance > 1000)
+                if (savedClient.Type == AccountTypeEnum.Current && savedClient.IncomeAmount > 1000)
                 {
-                    var resultCreditCard = SendCreditCardAsync(savedClient);
-                    if (!resultCreditCard.IsSuccess)
-                    {
-                        _logger.LogWarning("Error to send message: {Message}", resultCreditCard.Message);
-                        return Result<bool>.Failure(resultCreditCard.Message);
-                    } 
+                    // Gerar cartão de crédito
+                    var creditCardEvent = new CreditCardRequestEvent(
+                        savedClient.Id,
+                        CreditCardTypeEnum.Gold,
+                        Guid.NewGuid()
+                    );
+
+                    _eventBus.Publish(creditCardEvent);
+                    _logger.LogInformation("Published CreditCardRequestEvent for client {Id}", savedClient.Id);
                 }
                 else
                 {
-                    var resultCreditProposal = SendCreditProposalAsync(savedClient);
-                    if (!resultCreditProposal.IsSuccess)
-                    {
-                        _logger.LogWarning("Error to send message: {Message}", resultCreditProposal.Message);
-                        return Result<bool>.Failure(resultCreditProposal.Message);
-                    }
-                }
+                    // Gerar proposta de crédito
+                    var creditProposalEvent = new CreditProposalRequestEvent(
+                        savedClient.Id,
+                        savedClient.IncomeAmount,
+                        Guid.NewGuid()
+                    );
 
+                    _eventBus.Publish(creditProposalEvent);
+                    _logger.LogInformation("Published CreditProposalRequestEvent for client {Id}", savedClient.Id);
+                }
                 return Result<bool>.Success(true, "Cliente criado com sucesso.");
 
             }
@@ -85,37 +87,7 @@ namespace API.Services
             }
         }
 
-        private Result<bool> SendCreditProposalAsync(ClientDto client)
-        {
-            try
-            {
-                var @event = new CreditProposalEvent(client.Id, client.IncomeAmount);
-                _eventBus.Publish(@event);
 
-                return Result<bool>.Success(true, "Credit proposal message sent successfully.");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error sending credit proposal");
-                return Result<bool>.Failure("An error occurred while sending the credit proposal.");
-            }
-        }
-
-        private Result<bool> SendCreditCardAsync(ClientDto client)
-        {
-            try
-            {
-                var @event = new CreditCardCreationEvent(client.Id);
-                _eventBus.Publish(@event);
-
-                return Result<bool>.Success(true, "Credit card creation message sent successfully.");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error sending credit card creation");
-                return Result<bool>.Failure("An error occurred while sending the credit card creation.");
-            }
-        }
 
         public async Task<Result<ClientDto>> GetClientByIdAsync(Guid id)
         {

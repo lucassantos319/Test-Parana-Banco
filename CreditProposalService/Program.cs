@@ -12,6 +12,7 @@ builder.Services.AddMediatR(cfg =>
     cfg.RegisterServicesFromAssemblies(
         typeof(Program).Assembly,
         typeof(CreditProposalEvent).Assembly,
+        typeof(CreditProposalResultEvent).Assembly,
         typeof(RabbitMqClientBus).Assembly
     );
 });
@@ -21,7 +22,7 @@ builder.Services.AddTransient<IEventBus, RabbitMqClientBus>();
 builder.Services.AddSingleton<IConfiguration>(builder.Configuration);
 
 builder.Services.AddTransient<CreditProposalWorker>();
-builder.Services.AddTransient<IEventHandler<CreditProposalEvent>, CreditProposalWorker>();
+builder.Services.AddTransient<IEventHandler<CreditProposalRequestEvent>, CreditProposalWorker>();
 
 var host = builder.Build();
 
@@ -31,6 +32,6 @@ host.Run();
 void ConfigureEventBus(IHost host)
 {
     var eventBus = host.Services.GetRequiredService<IEventBus>();
-    eventBus.Subscribe<CreditProposalEvent, CreditProposalWorker>();
+    eventBus.Subscribe<CreditProposalRequestEvent, CreditProposalWorker>();
 }
 

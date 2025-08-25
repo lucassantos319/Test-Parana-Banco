@@ -9,7 +9,7 @@ using SharedLib.Domain.DTOs;
 
 namespace CreditProposalService
 {
-    public class CreditProposalWorker : IEventHandler<CreditProposalEvent>
+    public class CreditProposalWorker : IEventHandler<CreditProposalRequestEvent>
     {
         private readonly IEventBus _eventBus;
         private readonly IConfiguration _configuration;
@@ -25,12 +25,12 @@ namespace CreditProposalService
         }
 
 
-        public Task Handle(CreditProposalEvent @event)
+        public Task Handle(CreditProposalRequestEvent @event)
         {
             try
             {
-                _logger.LogInformation("Processing credit proposal for client {ClientId} with income balance {IncomeBalance}", 
-                    @event.ClientId, @event.IncomeBalance);
+                _logger.LogInformation("Processing credit proposal for client {ClientId} with income balance {IncomeAmount}", 
+                    @event.ClientId, @event.IncomeAmount);
 
                 var creditProposal = new CreditProposalDto
                 {
@@ -39,18 +39,18 @@ namespace CreditProposalService
                     CreatedAt = DateTime.UtcNow
                 };
 
-                if (@event.IncomeBalance < MinThreshold)
+                if (@event.IncomeAmount < MinThreshold)
                 {
                     creditProposal.Status = CreditProposalStatusEnum.Rejected;
                     creditProposal.Observations = "Income balance below minimum threshold.";
                     creditProposal.ApprovedLimit = 0;
                     
-                    _logger.LogInformation("Credit proposal REJECTED for client {ClientId}. Income {IncomeBalance} < Threshold {Threshold}", 
-                        @event.ClientId, @event.IncomeBalance, MinThreshold);
+                    _logger.LogInformation("Credit proposal REJECTED for client {ClientId}. Income {IncomeAmount} < Threshold {Threshold}", 
+                        @event.ClientId, @event.IncomeAmount, MinThreshold);
                 }
-                else if (@event.IncomeBalance >= MinThreshold)
+                else if (@event.IncomeAmount >= MinThreshold)
                 {
-                    var approvedLimit = @event.IncomeBalance * 2.5m; 
+                    var approvedLimit = @event.IncomeAmount * 2.5m; 
 
                     creditProposal.Status = CreditProposalStatusEnum.PreApproved;
                     creditProposal.ApprovedLimit = approvedLimit;
@@ -61,7 +61,7 @@ namespace CreditProposalService
                 }
 
                 var @eventCreditProposalResult = new CreditProposalResultEvent(creditProposal);
-                _eventBus.Publish(@event);
+                _eventBus.Publish(@eventCreditProposalResult);
 
                 _logger.LogInformation("CreditProposalResultEvent published for client {ClientId}", @event.ClientId);
 
